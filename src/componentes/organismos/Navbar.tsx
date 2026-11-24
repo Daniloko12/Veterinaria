@@ -19,7 +19,7 @@ const enlaces = [
 
 function Navbar() {
   const [menuAbierto, setMenuAbierto] = useState(false)
-  const { sesion, esAdmin, cerrarSesion } = useSesion()
+  const { sesion, esPersonal, tieneRol, cerrarSesion } = useSesion()
   const { total, cantidadTotal } = useCarrito()
   const navigate = useNavigate()
 
@@ -32,9 +32,9 @@ function Navbar() {
     navigate(texto ? `/productos?buscar=${encodeURIComponent(texto)}` : '/productos')
   }
 
-  function salir() {
-    cerrarSesion()
+  async function salir() {
     cerrarMenu()
+    await cerrarSesion()
     navigate('/')
   }
 
@@ -68,7 +68,11 @@ function Navbar() {
                 {sesion ? (
                   <div className="d-flex flex-wrap gap-2 align-items-center">
                     <span className="small text-nowrap">Hola, {sesion.nombre}</span>
-                    {esAdmin && <BotonEnlace a="/admin" texto="Panel admin" variante="dark" tamano="sm" />}
+                    {/* Cada rol ve solo los accesos que le corresponden */}
+                    {esPersonal && <BotonEnlace a="/admin" texto="Panel" variante="dark" tamano="sm" />}
+                    {tieneRol('cliente') && (
+                      <BotonEnlace a="/mis-compras" texto="Mis compras" variante="outline-dark" tamano="sm" />
+                    )}
                     <Boton texto="Cerrar sesión" variante="outline-danger" tamano="sm" onClick={salir} />
                   </div>
                 ) : (

@@ -8,10 +8,10 @@ import SelectorRegionComuna from '../moleculas/SelectorRegionComuna'
 
 interface FormularioRegistroProps {
   /**
-   * Guarda el usuario. Devuelve errores adicionales (ej: RUN o correo repetido)
-   * o un objeto vacio si el registro fue exitoso.
+   * Guarda el usuario en el backend. Devuelve errores adicionales (ej: RUN o correo repetido)
+   * o un objeto vacío si el registro fue exitoso.
    */
-  onRegistrar: (datos: DatosRegistro) => Errores<DatosRegistro>
+  onRegistrar: (datos: DatosRegistro) => Promise<Errores<DatosRegistro>>
 }
 
 const datosVacios: DatosRegistro = {
@@ -31,12 +31,13 @@ function FormularioRegistro({ onRegistrar }: FormularioRegistroProps) {
   const [datos, setDatos] = useState<DatosRegistro>(datosVacios)
   const [errores, setErrores] = useState<Errores<DatosRegistro>>({})
   const [registrado, setRegistrado] = useState(false)
+  const [enviando, setEnviando] = useState(false)
 
   function actualizar(campo: keyof DatosRegistro, valor: string) {
     setDatos((actuales) => ({ ...actuales, [campo]: valor }))
   }
 
-  function enviar(evento: FormEvent<HTMLFormElement>) {
+  async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
     setRegistrado(false)
 
@@ -46,7 +47,9 @@ function FormularioRegistro({ onRegistrar }: FormularioRegistroProps) {
       return
     }
 
-    const erroresRegistro = onRegistrar(datos)
+    setEnviando(true)
+    const erroresRegistro = await onRegistrar(datos)
+    setEnviando(false)
     setErrores(erroresRegistro)
     if (!tieneErrores(erroresRegistro)) {
       setRegistrado(true)
@@ -58,7 +61,7 @@ function FormularioRegistro({ onRegistrar }: FormularioRegistroProps) {
     <form className="card card-body shadow-sm" onSubmit={enviar} noValidate>
       {registrado && (
         <div className="alert alert-success" role="status">
-          Usuario registrado correctamente. Ya puedes <Link to="/login">iniciar sesión</Link>.
+          Cuenta creada correctamente y tu sesión ya está iniciada. <Link to="/productos">Ir a comprar</Link>.
         </div>
       )}
 
@@ -168,7 +171,7 @@ function FormularioRegistro({ onRegistrar }: FormularioRegistroProps) {
       />
 
       <div>
-        <Boton texto="Crear cuenta" tipo="submit" />
+        <Boton texto={enviando ? 'Creando cuenta…' : 'Crear cuenta'} tipo="submit" deshabilitado={enviando} />
       </div>
     </form>
   )

@@ -1,48 +1,66 @@
-import { useState, type ReactNode } from 'react'
-import { autenticarUsuario, eliminarSesion, guardarSesion, obtenerSesion } from '../datos/baseDatos'
-import type { Sesion } from '../tipos'
+import { useEffect, useState, type ReactNode } from 'react'
+import { cerrarSesionEnServidor, iniciarSesion as pedirLogin, obtenerMiPerfil } from '../api/usuariosApi'
+import {
+  actualizarUsuarioGuardado,
+  alCambiarSesion,
+  borrarSesionGuardada,
+  guardarTokens,
+  leerSesionGuardada,
+} from '../api/tokens'
+import type { Rol, Sesion } from '../tipos'
 import { SesionContexto } from './SesionContexto'
 
 interface SesionProviderProps {
   children: ReactNode
 }
 
-// Mantiene en estado al usuario conectado y lo sincroniza con localStorage
+// Mantiene al usuario conectado. Los tokens JWT quedan en localStorage,
+// por eso la sesión sigue iniciada aunque se recargue la página.
 function SesionProvider({ children }: SesionProviderProps) {
-  const [sesion, setSesion] = useState<Sesion | null>(() => obtenerSesion())
+  const [sesion, setSesion] = useState<Sesion | null>(() => leerSesionGuardada()?.usuario ?? null)
 
-  function iniciarSesion(correo: string, clave: string): Sesion | null {
-    const usuario = autenticarUsuario(correo, clave)
-    if (!usuario) {
-      return null
+  useEffect(() => {
+    // Si los tokens se renuevan o la sesión expira, se actualiza la pantalla
+    const dejarDeEscuchar = alCambiarSesion((guardada) => setSesion(guardada?.usuario ?? null))
+
+    // Al abrir la página con una sesión guardada, se comprueba el token con el backend.
+    // Si venció se renueva solo; si ya no sirve, la sesión se cierra.
+    if (leerSesionGuardada()) {
+      obtenerMiPerfil().catch(() => {})
     }
-    const nueva: Sesion = {
-      id: usuario.id,
-      nombre: usuario.nombre,
-      apellidos: usuario.apellidos,
-      correo: usuario.correo,
-      rol: usuario.rol,
-    }
-    guardarSesion(nueva)
-    setSesion(nueva)
-    return nueva
+    return dejarDeEscuchar
+  }, [])
+
+  async function iniciarSesion(correo: string, clave: string): Promise<Sesion> {
+    const respuesta = await pedirLogin(correo, clave)
+    guardarTokens(respuesta)
+    return respuesta.usuario
   }
 
-  function cerrarSesion() {
-    eliminarSesion()
-    setSesion(null)
+  async function cerrarSesion() {
+    const guardada = leerSesionGuardada()
+    borrarSesionGuardada()
+    if (guardada) {
+      // Se anula el token de renovación en el servidor (si falla, igual se cierra en el navegador)
+      await cerrarSesionEnServidor(guardada.tokenRenovacion).catch(() => {})
+    }
   }
 
   function actualizarSesion(nueva: Sesion) {
-    guardarSesion(nueva)
-    setSesion(nueva)
+    actualizarUsuarioGuardado(nueva)
+  }
+
+  function tieneRol(...roles: Rol[]) {
+    return sesion !== null && roles.includes(sesion.rol)
   }
 
   return (
     <SesionContexto.Provider
       value={{
         sesion,
-        esAdmin: sesion?.rol === 'administrador',
+        esAdmin: tieneRol('administrador'),
+        esPersonal: tieneRol('administrador', 'recepcionista'),
+        tieneRol,
         iniciarSesion,
         cerrarSesion,
         actualizarSesion,

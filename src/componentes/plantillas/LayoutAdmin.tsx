@@ -7,8 +7,8 @@ function LayoutAdmin() {
   const { sesion, cerrarSesion } = useSesion()
   const navigate = useNavigate()
 
-  function salir() {
-    cerrarSesion()
+  async function salir() {
+    await cerrarSesion()
     navigate('/login')
   }
 
@@ -16,9 +16,11 @@ function LayoutAdmin() {
     <div className="min-vh-100 bg-body-tertiary">
       <header className="navbar navbar-dark bg-dark px-3">
         <Link to="/admin" className="navbar-brand">
-          Veterinaria San Marcos · Admin
+          Veterinaria San Marcos · Panel
         </Link>
-        <span className="text-white-50 small">Sesión: {sesion?.nombre}</span>
+        <span className="text-white-50 small">
+          Sesión: {sesion?.nombre} <span className="badge text-bg-light text-capitalize">{sesion?.rol}</span>
+        </span>
       </header>
 
       <div className="container-fluid">

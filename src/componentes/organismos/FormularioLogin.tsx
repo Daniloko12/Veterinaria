@@ -9,9 +9,11 @@ interface FormularioLoginProps {
   onIngresar: (datos: DatosLogin) => void
   /** Error general (por ejemplo: credenciales incorrectas) */
   errorGeneral?: string
+  /** true mientras se espera la respuesta del backend */
+  procesando?: boolean
 }
 
-function FormularioLogin({ onIngresar, errorGeneral }: FormularioLoginProps) {
+function FormularioLogin({ onIngresar, errorGeneral, procesando = false }: FormularioLoginProps) {
   const [datos, setDatos] = useState<DatosLogin>({ correo: '', clave: '' })
   const [errores, setErrores] = useState<Errores<DatosLogin>>({})
 
@@ -52,7 +54,7 @@ function FormularioLogin({ onIngresar, errorGeneral }: FormularioLoginProps) {
       <MensajeError mensaje={errorGeneral} />
 
       <div className="d-grid mt-2">
-        <Boton texto="Ingresar" tipo="submit" />
+        <Boton texto={procesando ? 'Ingresando…' : 'Ingresar'} tipo="submit" deshabilitado={procesando} />
       </div>
     </form>
   )
