@@ -4,11 +4,12 @@ import Boton from '../../componentes/atomos/Boton'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
 import Aviso from '../../componentes/moleculas/Aviso'
 import BoletaOrden from '../../componentes/organismos/BoletaOrden'
-import { obtenerOrdenPorId } from '../../datos/baseDatos'
+import { leerUltimaOrden } from '../../datos/almacenamiento'
 
 function CompraExitosa() {
   const { id } = useParams()
-  const orden = obtenerOrdenPorId(Number(id))
+  // La orden recién creada la guarda el checkout (sirve también para compras sin cuenta)
+  const orden = leerUltimaOrden(Number(id))
   const [mensaje, setMensaje] = useState('')
 
   if (!orden || orden.estado !== 'pagada') {

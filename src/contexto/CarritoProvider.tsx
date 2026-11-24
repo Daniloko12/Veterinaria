@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { guardarCarrito, obtenerCarrito, obtenerProductoPorId } from '../datos/baseDatos'
+import { guardarCarrito, obtenerCarrito } from '../datos/almacenamiento'
 import type { ItemCarrito, Producto } from '../tipos'
 import { calcularTotal, contarUnidades } from '../utilidades/carrito'
 import { precioFinal } from '../utilidades/productos'
@@ -9,7 +9,7 @@ interface CarritoProviderProps {
   children: ReactNode
 }
 
-// Estado global del carrito, persistido en localStorage
+// Estado global del carrito, persistido en localStorage (el carrito no se guarda en el backend)
 function CarritoProvider({ children }: CarritoProviderProps) {
   const [items, setItems] = useState<ItemCarrito[]>(() => obtenerCarrito())
 
@@ -29,7 +29,7 @@ function CarritoProvider({ children }: CarritoProviderProps) {
     if (existente) {
       setItems(
         items.map((item) =>
-          item.productoId === producto.id ? { ...item, cantidad: item.cantidad + cantidad } : item,
+          item.productoId === producto.id ? { ...item, cantidad: item.cantidad + cantidad, stock: producto.stock } : item,
         ),
       )
     } else {
@@ -41,6 +41,7 @@ function CarritoProvider({ children }: CarritoProviderProps) {
           precio: precioFinal(producto),
           cantidad,
           imagen: producto.imagen,
+          stock: producto.stock,
         },
       ])
     }
@@ -52,10 +53,11 @@ function CarritoProvider({ children }: CarritoProviderProps) {
       quitarProducto(productoId)
       return
     }
-    const stock = obtenerProductoPorId(productoId)?.stock ?? cantidad
-    const permitida = Math.min(cantidad, stock)
+    // No se puede pedir más que el stock que había al agregar el producto (el backend lo vuelve a revisar al pagar)
     setItems((actuales) =>
-      actuales.map((item) => (item.productoId === productoId ? { ...item, cantidad: permitida } : item)),
+      actuales.map((item) =>
+        item.productoId === productoId ? { ...item, cantidad: Math.min(cantidad, item.stock ?? cantidad) } : item,
+      ),
     )
   }
 

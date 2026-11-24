@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
-import { obtenerNovedadPorId, obtenerNovedades } from '../../datos/baseDatos'
+import { obtenerNovedadPorId, obtenerNovedades } from '../../datos/blog'
 import { formatearFecha } from '../../utilidades/formato'
 
 function DetalleBlog() {

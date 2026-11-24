@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { mensajeDeError } from '../../api/cliente'
+import { crearOrden } from '../../api/ordenesApi'
+import { obtenerMiPerfil } from '../../api/usuariosApi'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
+import Aviso from '../../componentes/moleculas/Aviso'
 import FormularioCheckout from '../../componentes/organismos/FormularioCheckout'
 import TablaItemsOrden from '../../componentes/organismos/TablaItemsOrden'
-import { obtenerUsuarioPorId, procesarCompra } from '../../datos/baseDatos'
+import { guardarUltimaOrden } from '../../datos/almacenamiento'
 import { useCarrito } from '../../hooks/useCarrito'
 import { useSesion } from '../../hooks/useSesion'
 import { formatearPrecio } from '../../utilidades/formato'
-import type { DatosTarjeta } from '../../tipos'
+import type { DatosTarjeta, Usuario } from '../../tipos'
 import type { DatosCheckout } from '../../utilidades/validaciones'
 
 interface CheckoutProps {
@@ -20,7 +24,23 @@ function Checkout({ demoraPago = 1500 }: CheckoutProps) {
   const { sesion } = useSesion()
   const navigate = useNavigate()
   const [procesando, setProcesando] = useState(false)
+  const [errorPago, setErrorPago] = useState('')
+  const [usuario, setUsuario] = useState<Usuario | null>(null)
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Si el usuario inició sesión, sus datos se completan automáticamente (GET /api/auth/me)
+  useEffect(() => {
+    if (!sesion) return
+    let vigente = true
+    obtenerMiPerfil()
+      .then((perfil) => {
+        if (vigente) setUsuario(perfil)
+      })
+      .catch(() => {})
+    return () => {
+      vigente = false
+    }
+  }, [sesion])
 
   // Si se sale de la página mientras se procesa el pago, se cancela el temporizador
   useEffect(() => {
@@ -39,8 +59,6 @@ function Checkout({ demoraPago = 1500 }: CheckoutProps) {
     )
   }
 
-  // Si el usuario inicio sesion, sus datos se completan automaticamente
-  const usuario = sesion ? obtenerUsuarioPorId(sesion.id) : undefined
   const valoresIniciales: DatosCheckout = {
     nombre: usuario?.nombre ?? '',
     apellidos: usuario?.apellidos ?? '',
@@ -55,6 +73,7 @@ function Checkout({ demoraPago = 1500 }: CheckoutProps) {
   // Simula que el banco tarda un momento en aprobar o rechazar el pago
   function confirmar(datos: DatosCheckout, tarjeta: DatosTarjeta) {
     setProcesando(true)
+    setErrorPago('')
     if (demoraPago > 0) {
       temporizador.current = setTimeout(() => pagar(datos, tarjeta), demoraPago)
     } else {
@@ -62,21 +81,29 @@ function Checkout({ demoraPago = 1500 }: CheckoutProps) {
     }
   }
 
-  function pagar(datos: DatosCheckout, tarjeta: DatosTarjeta) {
-    const orden = procesarCompra({
-      cliente: { nombre: datos.nombre.trim(), apellidos: datos.apellidos.trim(), correo: datos.correo.trim() },
-      direccion: {
-        calle: datos.calle.trim(),
-        departamento: datos.departamento.trim(),
-        region: datos.region,
-        comuna: datos.comuna,
-        indicaciones: datos.indicaciones.trim(),
-      },
-      items,
-      usuarioId: sesion?.id ?? null,
-      tarjeta,
-    })
+  // POST /api/ordenes (ms-ordenes): el backend valida el stock, procesa el pago y descuenta el stock
+  async function pagar(datos: DatosCheckout, tarjeta: DatosTarjeta) {
+    let orden
+    try {
+      orden = await crearOrden({
+        cliente: { nombre: datos.nombre.trim(), apellidos: datos.apellidos.trim(), correo: datos.correo.trim() },
+        direccion: {
+          calle: datos.calle.trim(),
+          departamento: datos.departamento.trim(),
+          region: datos.region,
+          comuna: datos.comuna,
+          indicaciones: datos.indicaciones.trim(),
+        },
+        items: items.map((item) => ({ productoId: item.productoId, cantidad: item.cantidad })),
+        tarjeta,
+      })
+    } catch (error) {
+      setProcesando(false)
+      setErrorPago(mensajeDeError(error))
+      return
+    }
     setProcesando(false)
+    guardarUltimaOrden(orden)
 
     if (orden.estado === 'pagada') {
       vaciarCarrito()
@@ -108,7 +135,11 @@ function Checkout({ demoraPago = 1500 }: CheckoutProps) {
             </p>
           )}
 
+          <Aviso mensaje={errorPago} tipo="danger" onCerrar={() => setErrorPago('')} />
+
+          {/* La key vuelve a crear el formulario cuando llegan los datos del usuario */}
           <FormularioCheckout
+            key={usuario ? `usuario-${usuario.id}` : 'invitado'}
             valoresIniciales={valoresIniciales}
             total={total}
             procesando={procesando}

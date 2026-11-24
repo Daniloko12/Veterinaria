@@ -1,17 +1,28 @@
-import { useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { listarCategorias, listarProductos } from '../../api/productosApi'
 import Aviso from '../../componentes/moleculas/Aviso'
 import CardCategoria from '../../componentes/moleculas/CardCategoria'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
 import ListaProductos from '../../componentes/organismos/ListaProductos'
-import { obtenerCategorias, obtenerProductos } from '../../datos/baseDatos'
 import { useAgregarAlCarrito } from '../../hooks/useAgregarAlCarrito'
+import { useCargar } from '../../hooks/useCargar'
 
 // Vista de categorias. Con /categorias/:id muestra los productos de esa categoria.
 function Categorias() {
   const { id } = useParams()
-  const [categorias] = useState(() => obtenerCategorias())
-  const [productos] = useState(() => obtenerProductos())
+  const { datos, cargando, error, recargar } = useCargar(() => Promise.all([listarCategorias(), listarProductos()]))
   const { aviso, agregar, cerrarAviso } = useAgregarAlCarrito()
+
+  if (!datos) {
+    return (
+      <div className="container">
+        <h1 className="h2 mb-3">Categorías</h1>
+        <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
+      </div>
+    )
+  }
+
+  const [categorias, productos] = datos
 
   const seleccionada = id ? categorias.find((categoria) => categoria.id === Number(id)) : undefined
   const productosCategoria = seleccionada

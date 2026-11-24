@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { listarCategorias, listarProductos } from '../../api/productosApi'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
 import Aviso from '../../componentes/moleculas/Aviso'
 import CardCategoria from '../../componentes/moleculas/CardCategoria'
 import CardNovedad from '../../componentes/moleculas/CardNovedad'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
 import Carrusel, { type Diapositiva } from '../../componentes/organismos/Carrusel'
 import ListaProductos from '../../componentes/organismos/ListaProductos'
-import { obtenerCategorias, obtenerNovedades, obtenerProductos } from '../../datos/baseDatos'
+import { obtenerNovedades } from '../../datos/blog'
 import { useAgregarAlCarrito } from '../../hooks/useAgregarAlCarrito'
+import { useCargar } from '../../hooks/useCargar'
 
 const diapositivas: Diapositiva[] = [
   {
@@ -33,11 +35,11 @@ const servicios = [
 ]
 
 function Inicio() {
-  const [productos] = useState(() => obtenerProductos())
-  const [categorias] = useState(() => obtenerCategorias())
-  const [novedades] = useState(() => obtenerNovedades())
+  const { datos, cargando, error, recargar } = useCargar(() => Promise.all([listarProductos(), listarCategorias()]))
+  const novedades = obtenerNovedades()
   const { aviso, agregar, cerrarAviso } = useAgregarAlCarrito()
 
+  const [productos, categorias] = datos ?? [[], []]
   const destacados = productos.filter((producto) => producto.descuento > 0).slice(0, 4)
 
   return (
@@ -68,6 +70,8 @@ function Inicio() {
           ))}
         </div>
       </section>
+
+      <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
 
       <section className="mb-5">
         <h2 className="h4 mb-3">Categorías</h2>

@@ -1,21 +1,24 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { listarCategorias, listarProductos } from '../../api/productosApi'
 import Aviso from '../../componentes/moleculas/Aviso'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
 import FiltrosProductos from '../../componentes/organismos/FiltrosProductos'
 import ListaProductos from '../../componentes/organismos/ListaProductos'
-import { obtenerCategorias, obtenerProductos } from '../../datos/baseDatos'
 import { useAgregarAlCarrito } from '../../hooks/useAgregarAlCarrito'
+import { useCargar } from '../../hooks/useCargar'
 import { filtrarProductos, filtrosVacios, type FiltrosProductos as Filtros } from '../../utilidades/productos'
 
 function Productos() {
-  const [productos] = useState(() => obtenerProductos())
-  const [categorias] = useState(() => obtenerCategorias())
+  // GET /api/productos y GET /api/categorias (ms-productos)
+  const { datos, cargando, error, recargar } = useCargar(() => Promise.all([listarProductos(), listarCategorias()]))
   const [searchParams, setSearchParams] = useSearchParams()
   const [otrosFiltros, setOtrosFiltros] = useState<Omit<Filtros, 'texto'>>(filtrosVacios)
   const { aviso, agregar, cerrarAviso } = useAgregarAlCarrito()
 
   // El texto de busqueda vive en la URL (?buscar=) para que funcione el buscador del menu
   const filtros: Filtros = { ...otrosFiltros, texto: searchParams.get('buscar') ?? '' }
+  const [productos, categorias] = datos ?? [[], []]
   const resultado = filtrarProductos(productos, filtros)
 
   function cambiarFiltros(nuevos: Filtros) {
@@ -41,18 +44,24 @@ function Productos() {
         onLimpiar={limpiarFiltros}
       />
 
-      <p className="small text-muted" aria-live="polite">
-        Mostrando {resultado.length} de {productos.length} productos
-      </p>
+      <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
 
-      <Aviso mensaje={aviso?.mensaje} tipo={aviso?.tipo} onCerrar={cerrarAviso} />
+      {datos && (
+        <>
+          <p className="small text-muted" aria-live="polite">
+            Mostrando {resultado.length} de {productos.length} productos
+          </p>
 
-      <ListaProductos
-        productos={resultado}
-        categorias={categorias}
-        onAgregar={agregar}
-        mensajeVacio="No se encontraron productos con esos filtros."
-      />
+          <Aviso mensaje={aviso?.mensaje} tipo={aviso?.tipo} onCerrar={cerrarAviso} />
+
+          <ListaProductos
+            productos={resultado}
+            categorias={categorias}
+            onAgregar={agregar}
+            mensajeVacio="No se encontraron productos con esos filtros."
+          />
+        </>
+      )}
     </div>
   )
 }

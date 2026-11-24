@@ -1,22 +1,23 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { listarProductos } from '../../api/productosApi'
 import Boton from '../../componentes/atomos/Boton'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
 import Aviso from '../../componentes/moleculas/Aviso'
 import ListaProductos from '../../componentes/organismos/ListaProductos'
 import TablaCarrito from '../../componentes/organismos/TablaCarrito'
-import { obtenerProductos } from '../../datos/baseDatos'
 import { useAgregarAlCarrito } from '../../hooks/useAgregarAlCarrito'
+import { useCargar } from '../../hooks/useCargar'
 import { useCarrito } from '../../hooks/useCarrito'
 import { formatearPrecio } from '../../utilidades/formato'
 
 function Carrito() {
   const { items, total, cantidadTotal, cambiarCantidad, quitarProducto, vaciarCarrito } = useCarrito()
   const { aviso, agregar, cerrarAviso } = useAgregarAlCarrito()
-  const [productos] = useState(() => obtenerProductos())
+  // Sugerencias: si la API no responde, simplemente no se muestran
+  const { datos: productos } = useCargar(listarProductos)
   const navigate = useNavigate()
 
-  const sugeridos = productos
+  const sugeridos = (productos ?? [])
     .filter((producto) => producto.stock > 0 && !items.some((item) => item.productoId === producto.id))
     .slice(0, 4)
 

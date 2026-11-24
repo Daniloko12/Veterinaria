@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import CardNovedad from '../../componentes/moleculas/CardNovedad'
-import { obtenerNovedades } from '../../datos/baseDatos'
+import { obtenerNovedades } from '../../datos/blog'
 
 function Blog() {
   const [novedades] = useState(() => obtenerNovedades())

@@ -1,23 +1,47 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ErrorApi } from '../../api/cliente'
+import { listarProductosDeCategoria, obtenerProducto } from '../../api/productosApi'
 import Boton from '../../componentes/atomos/Boton'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
 import Insignia from '../../componentes/atomos/Insignia'
 import Precio from '../../componentes/atomos/Precio'
 import Aviso from '../../componentes/moleculas/Aviso'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
 import ListaProductos from '../../componentes/organismos/ListaProductos'
-import { obtenerCategoriaPorId, obtenerProductoPorId, obtenerProductosPorCategoria } from '../../datos/baseDatos'
 import { useAgregarAlCarrito } from '../../hooks/useAgregarAlCarrito'
+import { useCargar } from '../../hooks/useCargar'
 
 interface VistaDetalleProps {
   id: number
 }
 
+// GET /api/productos/{id} y luego los productos de la misma categoría
+async function cargarDetalle(id: number) {
+  try {
+    const producto = await obtenerProducto(id)
+    const deLaCategoria = await listarProductosDeCategoria(producto.categoriaId)
+    return { producto, deLaCategoria }
+  } catch (error) {
+    if (error instanceof ErrorApi && error.estado === 404) return { producto: null, deLaCategoria: [] }
+    throw error
+  }
+}
+
 function VistaDetalle({ id }: VistaDetalleProps) {
-  const producto = obtenerProductoPorId(id)
+  const { datos, cargando, error, recargar } = useCargar(() => cargarDetalle(id))
   const [cantidad, setCantidad] = useState(1)
   const { aviso, agregar, cerrarAviso } = useAgregarAlCarrito()
 
+  if (!datos) {
+    return (
+      <div className="container">
+        <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
+      </div>
+    )
+  }
+
+  const { producto, deLaCategoria } = datos
   if (!producto) {
     return (
       <div className="container text-center py-5">
@@ -28,8 +52,7 @@ function VistaDetalle({ id }: VistaDetalleProps) {
     )
   }
 
-  const categoria = obtenerCategoriaPorId(producto.categoriaId)
-  const relacionados = obtenerProductosPorCategoria(producto.categoriaId)
+  const relacionados = deLaCategoria
     .filter((item) => item.id !== producto.id)
     .slice(0, 4)
   const sinStock = producto.stock <= 0
@@ -55,7 +78,9 @@ function VistaDetalle({ id }: VistaDetalleProps) {
           <img src={producto.imagen} alt={producto.nombre} className="img-fluid rounded border bg-white imagen-detalle" />
         </div>
         <div className="col-md-6">
-          {categoria && <Link to={`/categorias/${categoria.id}`}>{categoria.nombre}</Link>}
+          {producto.categoriaNombre && (
+            <Link to={`/categorias/${producto.categoriaId}`}>{producto.categoriaNombre}</Link>
+          )}
           <h1 className="h2 mt-1">{producto.nombre}</h1>
           <p className="small text-muted">Código: {producto.codigo}</p>
           <p className="fs-4 mb-1">
