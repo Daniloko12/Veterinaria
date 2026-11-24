@@ -9,7 +9,7 @@ import CampoSelect from '../moleculas/CampoSelect'
 
 interface FormularioCategoriaProps {
   categoria?: Categoria
-  onGuardar: (datos: Omit<Categoria, 'id'>) => Errores<DatosCategoriaFormulario>
+  onGuardar: (datos: Omit<Categoria, 'id'>) => Promise<Errores<DatosCategoriaFormulario>>
 }
 
 function FormularioCategoria({ categoria, onGuardar }: FormularioCategoriaProps) {
@@ -19,21 +19,27 @@ function FormularioCategoria({ categoria, onGuardar }: FormularioCategoriaProps)
     imagen: categoria?.imagen ?? imagenesDisponibles[0].ruta,
   })
   const [errores, setErrores] = useState<Errores<DatosCategoriaFormulario>>({})
+  const [enviando, setEnviando] = useState(false)
 
   function actualizar(campo: keyof DatosCategoriaFormulario, valor: string) {
     setDatos((actuales) => ({ ...actuales, [campo]: valor }))
   }
 
-  function enviar(evento: FormEvent<HTMLFormElement>) {
+  async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
     const erroresFormulario = validarCategoria(datos)
     if (tieneErrores(erroresFormulario)) {
       setErrores(erroresFormulario)
       return
     }
-    setErrores(
-      onGuardar({ nombre: datos.nombre.trim(), descripcion: datos.descripcion.trim(), imagen: datos.imagen }),
-    )
+    setEnviando(true)
+    const resultado = await onGuardar({
+      nombre: datos.nombre.trim(),
+      descripcion: datos.descripcion.trim(),
+      imagen: datos.imagen,
+    })
+    setEnviando(false)
+    setErrores(resultado)
   }
 
   return (
@@ -70,7 +76,11 @@ function FormularioCategoria({ categoria, onGuardar }: FormularioCategoriaProps)
         <img src={datos.imagen} alt="Vista previa de la imagen" className="vista-previa border rounded" />
       </div>
       <div className="d-flex gap-2">
-        <Boton texto={categoria ? 'Guardar cambios' : 'Crear categoría'} tipo="submit" />
+        <Boton
+          texto={enviando ? 'Guardando…' : categoria ? 'Guardar cambios' : 'Crear categoría'}
+          tipo="submit"
+          deshabilitado={enviando}
+        />
         <BotonEnlace a="/admin/categorias" texto="Cancelar" variante="outline-secondary" />
       </div>
     </form>

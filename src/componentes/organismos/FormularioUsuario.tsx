@@ -12,7 +12,7 @@ export type ModoFormularioUsuario = 'crear' | 'editar' | 'perfil'
 interface FormularioUsuarioProps {
   modo: ModoFormularioUsuario
   usuario?: Usuario
-  onGuardar: (datos: Omit<Usuario, 'id'>) => Errores<DatosUsuarioFormulario>
+  onGuardar: (datos: Omit<Usuario, 'id'>) => Promise<Errores<DatosUsuarioFormulario>>
   rutaCancelar: string
 }
 
@@ -41,13 +41,14 @@ function aFormulario(usuario?: Usuario): DatosUsuarioFormulario {
 function FormularioUsuario({ modo, usuario, onGuardar, rutaCancelar }: FormularioUsuarioProps) {
   const [datos, setDatos] = useState<DatosUsuarioFormulario>(() => aFormulario(usuario))
   const [errores, setErrores] = useState<Errores<DatosUsuarioFormulario>>({})
+  const [enviando, setEnviando] = useState(false)
   const claveOpcional = modo !== 'crear'
 
   function actualizar(campo: keyof DatosUsuarioFormulario, valor: string) {
     setDatos((actuales) => ({ ...actuales, [campo]: valor }))
   }
 
-  function enviar(evento: FormEvent<HTMLFormElement>) {
+  async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
     const erroresFormulario = validarUsuario(datos, claveOpcional)
     if (tieneErrores(erroresFormulario)) {
@@ -55,13 +56,14 @@ function FormularioUsuario({ modo, usuario, onGuardar, rutaCancelar }: Formulari
       return
     }
 
-    const resultado = onGuardar({
+    setEnviando(true)
+    const resultado = await onGuardar({
       run: datos.run.trim().toUpperCase(),
       nombre: datos.nombre.trim(),
       apellidos: datos.apellidos.trim(),
       correo: datos.correo.trim(),
-      // En edicion, la contraseña vacia mantiene la actual
-      clave: datos.clave === '' && usuario ? usuario.clave : datos.clave,
+      // En edición, la contraseña vacía mantiene la actual (lo resuelve el backend)
+      clave: datos.clave,
       fechaNacimiento: datos.fechaNacimiento,
       rol: datos.rol as Rol,
       region: datos.region,
@@ -69,6 +71,7 @@ function FormularioUsuario({ modo, usuario, onGuardar, rutaCancelar }: Formulari
       direccion: datos.direccion.trim(),
       activo: datos.activo === 'true',
     })
+    setEnviando(false)
     setErrores(resultado)
   }
 
@@ -194,7 +197,11 @@ function FormularioUsuario({ modo, usuario, onGuardar, rutaCancelar }: Formulari
       />
 
       <div className="d-flex gap-2">
-        <Boton texto={modo === 'crear' ? 'Crear usuario' : 'Guardar cambios'} tipo="submit" />
+        <Boton
+          texto={enviando ? 'Guardando…' : modo === 'crear' ? 'Crear usuario' : 'Guardar cambios'}
+          tipo="submit"
+          deshabilitado={enviando}
+        />
         <BotonEnlace a={rutaCancelar} texto="Cancelar" variante="outline-secondary" />
       </div>
     </form>

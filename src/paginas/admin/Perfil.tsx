@@ -1,31 +1,37 @@
 import { useState } from 'react'
+import { erroresDeFormulario } from '../../api/cliente'
+import { actualizarMiPerfil, obtenerMiPerfil } from '../../api/usuariosApi'
 import Aviso from '../../componentes/moleculas/Aviso'
 import EncabezadoPagina from '../../componentes/moleculas/EncabezadoPagina'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
 import FormularioUsuario from '../../componentes/organismos/FormularioUsuario'
-import { actualizarUsuario, existeCorreo, existeRun, obtenerUsuarioPorId } from '../../datos/baseDatos'
+import { useCargar } from '../../hooks/useCargar'
 import { useSesion } from '../../hooks/useSesion'
 import type { Errores, Usuario } from '../../tipos'
 import type { DatosUsuarioFormulario } from '../../utilidades/validaciones'
 
+const CAMPOS: (keyof DatosUsuarioFormulario)[] = ['run', 'nombre', 'apellidos', 'correo', 'clave', 'fechaNacimiento', 'region', 'comuna', 'direccion']
+
+// GET y PUT /api/auth/me: cada usuario edita sus propios datos (el rol no se puede cambiar aquí)
 function Perfil() {
-  const { sesion, actualizarSesion } = useSesion()
-  const [aviso, setAviso] = useState<string | null>(null)
-  const usuario = sesion ? obtenerUsuarioPorId(sesion.id) : undefined
+  const { actualizarSesion } = useSesion()
+  const { datos: usuario, cargando, error, recargar } = useCargar(obtenerMiPerfil)
+  const [aviso, setAviso] = useState<{ tipo: string; mensaje: string } | null>(null)
 
   if (!usuario) {
-    return <p className="alert alert-warning">No se encontró la información del perfil.</p>
+    return (
+      <div>
+        <EncabezadoPagina titulo="Mi perfil" descripcion="Actualiza tu información personal" />
+        <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
+      </div>
+    )
   }
 
-  function guardar(datos: Omit<Usuario, 'id'>): Errores<DatosUsuarioFormulario> {
+  async function guardar(datos: Omit<Usuario, 'id'>): Promise<Errores<DatosUsuarioFormulario>> {
     if (!usuario) return {}
-    const errores: Errores<DatosUsuarioFormulario> = {}
-    if (existeRun(datos.run, usuario.id)) errores.run = 'El RUN ya está registrado'
-    if (existeCorreo(datos.correo, usuario.id)) errores.correo = 'El correo ya está registrado'
-    if (errores.run || errores.correo) {
-      return errores
-    }
-    const actualizado = actualizarUsuario(usuario.id, { ...datos, rol: usuario.rol, activo: usuario.activo })
-    if (actualizado) {
+    setAviso(null)
+    try {
+      const actualizado = await actualizarMiPerfil({ ...datos, rol: usuario.rol, activo: usuario.activo })
       actualizarSesion({
         id: actualizado.id,
         nombre: actualizado.nombre,
@@ -33,15 +39,19 @@ function Perfil() {
         correo: actualizado.correo,
         rol: actualizado.rol,
       })
+      setAviso({ tipo: 'success', mensaje: 'Perfil actualizado correctamente' })
+      return {}
+    } catch (problema) {
+      const { errores, mensaje } = erroresDeFormulario<DatosUsuarioFormulario>(problema, CAMPOS)
+      if (mensaje) setAviso({ tipo: 'danger', mensaje })
+      return errores
     }
-    setAviso('Perfil actualizado correctamente')
-    return {}
   }
 
   return (
     <div>
       <EncabezadoPagina titulo="Mi perfil" descripcion="Actualiza tu información personal" />
-      <Aviso mensaje={aviso} onCerrar={() => setAviso(null)} />
+      <Aviso mensaje={aviso?.mensaje} tipo={aviso?.tipo} onCerrar={() => setAviso(null)} />
       <FormularioUsuario modo="perfil" usuario={usuario} onGuardar={guardar} rutaCancelar="/admin" />
     </div>
   )

@@ -1,35 +1,51 @@
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { mensajeDeError } from '../../api/cliente'
+import { cambiarEstadoUsuario, eliminarUsuario, listarUsuarios } from '../../api/usuariosApi'
 import Boton from '../../componentes/atomos/Boton'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
 import Insignia from '../../componentes/atomos/Insignia'
 import Aviso from '../../componentes/moleculas/Aviso'
 import EncabezadoPagina from '../../componentes/moleculas/EncabezadoPagina'
-import { actualizarUsuario, eliminarUsuario, obtenerUsuarios } from '../../datos/baseDatos'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
+import { useCargar } from '../../hooks/useCargar'
 import { useSesion } from '../../hooks/useSesion'
 import type { Usuario } from '../../tipos'
 
+// CRUD de usuarios con /api/usuarios (ms-usuarios), solo administrador
 function UsuariosAdmin() {
   const location = useLocation()
   const { sesion } = useSesion()
-  const [usuarios, setUsuarios] = useState(() => obtenerUsuarios())
-  const [aviso, setAviso] = useState<string | null>(
-    () => (location.state as { aviso?: string } | null)?.aviso ?? null,
-  )
+  const { datos, cargando, error, recargar } = useCargar(listarUsuarios)
+  const usuarios = datos ?? []
+  const [aviso, setAviso] = useState<{ tipo: string; mensaje: string } | null>(() => {
+    const mensaje = (location.state as { aviso?: string } | null)?.aviso
+    return mensaje ? { tipo: 'success', mensaje } : null
+  })
 
-  function cambiarEstado(usuario: Usuario) {
-    actualizarUsuario(usuario.id, { activo: !usuario.activo })
-    setUsuarios(obtenerUsuarios())
-    setAviso(`Usuario ${usuario.nombre} ${usuario.activo ? 'desactivado' : 'activado'}`)
+  // PATCH /api/usuarios/{id}/estado
+  async function cambiarEstado(usuario: Usuario) {
+    try {
+      await cambiarEstadoUsuario(usuario.id, !usuario.activo)
+      setAviso({ tipo: 'success', mensaje: `Usuario ${usuario.nombre} ${usuario.activo ? 'desactivado' : 'activado'}` })
+      recargar()
+    } catch (problema) {
+      setAviso({ tipo: 'danger', mensaje: mensajeDeError(problema) })
+    }
   }
 
-  function eliminar(usuario: Usuario) {
+  // DELETE /api/usuarios/{id}
+  async function eliminar(usuario: Usuario) {
     if (!window.confirm(`¿Eliminar al usuario ${usuario.nombre} ${usuario.apellidos}?`)) {
       return
     }
-    eliminarUsuario(usuario.id)
-    setUsuarios(obtenerUsuarios())
-    setAviso(`Usuario ${usuario.nombre} eliminado`)
+    try {
+      await eliminarUsuario(usuario.id)
+      setAviso({ tipo: 'success', mensaje: `Usuario ${usuario.nombre} eliminado` })
+      recargar()
+    } catch (problema) {
+      setAviso({ tipo: 'danger', mensaje: mensajeDeError(problema) })
+    }
   }
 
   return (
@@ -40,7 +56,8 @@ function UsuariosAdmin() {
         acciones={<BotonEnlace a="/admin/usuarios/nuevo" texto="Nuevo usuario" />}
       />
 
-      <Aviso mensaje={aviso} onCerrar={() => setAviso(null)} />
+      <Aviso mensaje={aviso?.mensaje} tipo={aviso?.tipo} onCerrar={() => setAviso(null)} />
+      <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
 
       <div className="table-responsive bg-white rounded shadow-sm">
         <table className="table align-middle mb-0">

@@ -1,11 +1,32 @@
 import { useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
+import { ErrorApi } from '../../api/cliente'
+import { listarOrdenes } from '../../api/ordenesApi'
+import { obtenerUsuario } from '../../api/usuariosApi'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
 import Insignia from '../../componentes/atomos/Insignia'
 import Aviso from '../../componentes/moleculas/Aviso'
 import EncabezadoPagina from '../../componentes/moleculas/EncabezadoPagina'
-import { obtenerOrdenesDeUsuario, obtenerUsuarioPorId } from '../../datos/baseDatos'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
+import InsigniaEstado from '../../componentes/moleculas/InsigniaEstado'
+import { useCargar } from '../../hooks/useCargar'
 import { formatearFecha, formatearPrecio } from '../../utilidades/formato'
+import { estaPagada } from '../../utilidades/ordenes'
+
+// Usuario (ms-usuarios) + su historial: órdenes con su id o su correo (ms-ordenes)
+async function cargarUsuario(id: number) {
+  try {
+    const [usuario, ordenes] = await Promise.all([obtenerUsuario(id), listarOrdenes()])
+    const correo = usuario.correo.toLowerCase()
+    const historial = ordenes.filter(
+      (orden) => orden.usuarioId === usuario.id || orden.cliente.correo.toLowerCase() === correo,
+    )
+    return { usuario, historial }
+  } catch (error) {
+    if (error instanceof ErrorApi && error.estado === 404) return { usuario: null, historial: [] }
+    throw error
+  }
+}
 
 // "Mostrar usuario" + historial de compras
 function DetalleUsuario() {
@@ -14,8 +35,13 @@ function DetalleUsuario() {
   const [aviso, setAviso] = useState<string | null>(
     () => (location.state as { aviso?: string } | null)?.aviso ?? null,
   )
-  const usuario = obtenerUsuarioPorId(Number(id))
+  const { datos, cargando, error, recargar } = useCargar(() => cargarUsuario(Number(id)))
 
+  if (!datos) {
+    return <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
+  }
+
+  const { usuario, historial } = datos
   if (!usuario) {
     return (
       <div>
@@ -25,9 +51,8 @@ function DetalleUsuario() {
     )
   }
 
-  const historial = obtenerOrdenesDeUsuario(usuario)
   const totalGastado = historial
-    .filter((orden) => orden.estado === 'pagada')
+    .filter(estaPagada)
     .reduce((suma, orden) => suma + orden.total, 0)
 
   return (
@@ -93,10 +118,7 @@ function DetalleUsuario() {
                       <td>{orden.items.reduce((suma, item) => suma + item.cantidad, 0)}</td>
                       <td>{formatearPrecio(orden.total)}</td>
                       <td>
-                        <Insignia
-                          texto={orden.estado === 'pagada' ? 'Pagada' : 'Rechazada'}
-                          color={orden.estado === 'pagada' ? 'success' : 'danger'}
-                        />
+                        <InsigniaEstado estado={orden.estado} />
                       </td>
                       <td>
                         <BotonEnlace a={`/admin/ordenes/${orden.id}`} texto="Ver" variante="outline-primary" tamano="sm" />

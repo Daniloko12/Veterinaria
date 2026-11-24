@@ -12,7 +12,7 @@ interface FormularioProductoProps {
   /** Producto a editar. Si no se entrega, el formulario crea uno nuevo. */
   producto?: Producto
   /** Devuelve errores adicionales (ej: codigo repetido) o {} si se guardo */
-  onGuardar: (datos: Omit<Producto, 'id'>) => Errores<DatosProductoFormulario>
+  onGuardar: (datos: Omit<Producto, 'id'>) => Promise<Errores<DatosProductoFormulario>>
   rutaCancelar: string
 }
 
@@ -33,12 +33,13 @@ function aFormulario(producto?: Producto): DatosProductoFormulario {
 function FormularioProducto({ categorias, producto, onGuardar, rutaCancelar }: FormularioProductoProps) {
   const [datos, setDatos] = useState<DatosProductoFormulario>(() => aFormulario(producto))
   const [errores, setErrores] = useState<Errores<DatosProductoFormulario>>({})
+  const [enviando, setEnviando] = useState(false)
 
   function actualizar(campo: keyof DatosProductoFormulario, valor: string) {
     setDatos((actuales) => ({ ...actuales, [campo]: valor }))
   }
 
-  function enviar(evento: FormEvent<HTMLFormElement>) {
+  async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
     const erroresFormulario = validarProducto(datos)
     if (tieneErrores(erroresFormulario)) {
@@ -46,7 +47,8 @@ function FormularioProducto({ categorias, producto, onGuardar, rutaCancelar }: F
       return
     }
 
-    const resultado = onGuardar({
+    setEnviando(true)
+    const resultado = await onGuardar({
       codigo: datos.codigo.trim().toUpperCase(),
       nombre: datos.nombre.trim(),
       descripcion: datos.descripcion.trim(),
@@ -57,6 +59,7 @@ function FormularioProducto({ categorias, producto, onGuardar, rutaCancelar }: F
       categoriaId: Number(datos.categoriaId),
       imagen: datos.imagen,
     })
+    setEnviando(false)
     setErrores(resultado)
   }
 
@@ -180,7 +183,11 @@ function FormularioProducto({ categorias, producto, onGuardar, rutaCancelar }: F
       </div>
 
       <div className="d-flex gap-2">
-        <Boton texto={producto ? 'Guardar cambios' : 'Crear producto'} tipo="submit" />
+        <Boton
+          texto={enviando ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear producto'}
+          tipo="submit"
+          deshabilitado={enviando}
+        />
         <BotonEnlace a={rutaCancelar} texto="Cancelar" variante="outline-secondary" />
       </div>
     </form>

@@ -1,24 +1,29 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { mensajeDeError } from '../../api/cliente'
+import { eliminarProducto, listarProductos } from '../../api/productosApi'
 import Boton from '../../componentes/atomos/Boton'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
 import Insignia from '../../componentes/atomos/Insignia'
 import Aviso from '../../componentes/moleculas/Aviso'
 import EncabezadoPagina from '../../componentes/moleculas/EncabezadoPagina'
-import { eliminarProducto, obtenerCategorias, obtenerProductos } from '../../datos/baseDatos'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
+import { useCargar } from '../../hooks/useCargar'
 import type { Producto } from '../../tipos'
 import { formatearPrecio } from '../../utilidades/formato'
 import { esStockCritico, normalizarTexto } from '../../utilidades/productos'
 
-// Listado de productos del administrador (Leer + Eliminar del CRUD)
+// Listado de productos del administrador (Leer + Eliminar del CRUD) con GET y DELETE /api/productos
 function ProductosAdmin() {
   const location = useLocation()
-  const [productos, setProductos] = useState(() => obtenerProductos())
-  const [categorias] = useState(() => obtenerCategorias())
+  const { datos, cargando, error, recargar } = useCargar(listarProductos)
   const [busqueda, setBusqueda] = useState('')
-  const [aviso, setAviso] = useState<string | null>(
-    () => (location.state as { aviso?: string } | null)?.aviso ?? null,
-  )
+  const [aviso, setAviso] = useState<{ tipo: string; mensaje: string } | null>(() => {
+    const mensaje = (location.state as { aviso?: string } | null)?.aviso
+    return mensaje ? { tipo: 'success', mensaje } : null
+  })
+
+  const productos = datos ?? []
 
   const texto = normalizarTexto(busqueda)
   const visibles = productos.filter(
@@ -26,13 +31,17 @@ function ProductosAdmin() {
       normalizarTexto(producto.nombre).includes(texto) || normalizarTexto(producto.codigo).includes(texto),
   )
 
-  function eliminar(producto: Producto) {
+  async function eliminar(producto: Producto) {
     if (!window.confirm(`¿Eliminar "${producto.nombre}"? Esta acción no se puede deshacer.`)) {
       return
     }
-    eliminarProducto(producto.id)
-    setProductos(obtenerProductos())
-    setAviso(`Producto "${producto.nombre}" eliminado`)
+    try {
+      await eliminarProducto(producto.id)
+      setAviso({ tipo: 'success', mensaje: `Producto "${producto.nombre}" eliminado` })
+      recargar()
+    } catch (problema) {
+      setAviso({ tipo: 'danger', mensaje: mensajeDeError(problema) })
+    }
   }
 
   return (
@@ -49,7 +58,8 @@ function ProductosAdmin() {
         }
       />
 
-      <Aviso mensaje={aviso} onCerrar={() => setAviso(null)} />
+      <Aviso mensaje={aviso?.mensaje} tipo={aviso?.tipo} onCerrar={() => setAviso(null)} />
+      <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
 
       <div className="mb-3" style={{ maxWidth: '22rem' }}>
         <label htmlFor="buscar-producto-admin" className="form-label">
@@ -88,7 +98,7 @@ function ProductosAdmin() {
                   <Link to={`/admin/productos/${producto.id}`}>{producto.nombre}</Link>
                   {producto.descuento > 0 && <Insignia texto={`-${producto.descuento}%`} color="danger" clase="ms-2" />}
                 </td>
-                <td>{categorias.find((categoria) => categoria.id === producto.categoriaId)?.nombre ?? '—'}</td>
+                <td>{producto.categoriaNombre ?? '—'}</td>
                 <td>{formatearPrecio(producto.precio)}</td>
                 <td>
                   <Insignia
@@ -119,7 +129,7 @@ function ProductosAdmin() {
           </tbody>
         </table>
       </div>
-      {visibles.length === 0 && <p className="alert alert-info mt-3">No hay productos que coincidan.</p>}
+      {datos && visibles.length === 0 && <p className="alert alert-info mt-3">No hay productos que coincidan.</p>}
     </div>
   )
 }

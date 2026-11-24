@@ -1,14 +1,22 @@
-import { useState } from 'react'
+import { listarOrdenes } from '../../api/ordenesApi'
+import { listarCategorias, listarProductos } from '../../api/productosApi'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
 import EncabezadoPagina from '../../componentes/moleculas/EncabezadoPagina'
-import { obtenerCategorias, obtenerOrdenes, obtenerProductos } from '../../datos/baseDatos'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
+import { useCargar } from '../../hooks/useCargar'
 import { formatearPrecio } from '../../utilidades/formato'
 import { inventarioPorCategoria, productosMasVendidos } from '../../utilidades/reportes'
 
 function ReportesProductos() {
-  const [productos] = useState(() => obtenerProductos())
-  const [categorias] = useState(() => obtenerCategorias())
-  const [ordenes] = useState(() => obtenerOrdenes())
+  const { datos, cargando, error, recargar } = useCargar(() =>
+    Promise.all([listarProductos(), listarCategorias(), listarOrdenes()]),
+  )
+
+  if (!datos) {
+    return <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
+  }
+
+  const [productos, categorias, ordenes] = datos
 
   const inventario = inventarioPorCategoria(productos, categorias)
   const valorTotal = inventario.reduce((suma, fila) => suma + fila.valor, 0)

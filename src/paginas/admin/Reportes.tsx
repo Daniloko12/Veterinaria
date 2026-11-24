@@ -1,14 +1,22 @@
-import { useState } from 'react'
+import { listarOrdenes } from '../../api/ordenesApi'
+import { listarCategorias, listarProductos } from '../../api/productosApi'
 import EncabezadoPagina from '../../componentes/moleculas/EncabezadoPagina'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
 import TarjetaEstadistica from '../../componentes/moleculas/TarjetaEstadistica'
-import { obtenerCategorias, obtenerOrdenes, obtenerProductos } from '../../datos/baseDatos'
+import { useCargar } from '../../hooks/useCargar'
 import { formatearPrecio } from '../../utilidades/formato'
 import { productosMasVendidos, resumenVentas, ventasPorCategoria } from '../../utilidades/reportes'
 
 function Reportes() {
-  const [ordenes] = useState(() => obtenerOrdenes())
-  const [productos] = useState(() => obtenerProductos())
-  const [categorias] = useState(() => obtenerCategorias())
+  const { datos, cargando, error, recargar } = useCargar(() =>
+    Promise.all([listarOrdenes(), listarProductos(), listarCategorias()]),
+  )
+
+  if (!datos) {
+    return <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
+  }
+
+  const [ordenes, productos, categorias] = datos
 
   const resumen = resumenVentas(ordenes)
   const porCategoria = ventasPorCategoria(ordenes, productos, categorias)

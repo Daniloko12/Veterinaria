@@ -1,5 +1,6 @@
 import type { Orden } from '../../tipos'
 import { formatearFechaHora, formatearPrecio } from '../../utilidades/formato'
+import { estaPagada } from '../../utilidades/ordenes'
 import { calcularIva } from '../../utilidades/pago'
 import TablaItemsOrden from './TablaItemsOrden'
 
@@ -27,7 +28,7 @@ function Dato({ etiqueta, valor }: DatoProps) {
 // La clase "boleta-imprimible" hace que al imprimir solo salga este bloque.
 function BoletaOrden({ orden, titulo = 'Boleta electrónica' }: BoletaOrdenProps) {
   const { neto, iva } = calcularIva(orden.total)
-  const pagada = orden.estado === 'pagada'
+  const pagada = estaPagada(orden)
 
   return (
     <article className="boleta-imprimible border rounded p-3 p-md-4 bg-white" aria-label={titulo}>

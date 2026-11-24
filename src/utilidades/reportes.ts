@@ -1,4 +1,5 @@
 import type { Categoria, Orden, Producto } from '../tipos'
+import { estaPagada } from './ordenes'
 
 export interface ResumenVentas {
   totalVendido: number
@@ -9,7 +10,7 @@ export interface ResumenVentas {
 }
 
 export function resumenVentas(ordenes: Orden[]): ResumenVentas {
-  const pagadas = ordenes.filter((orden) => orden.estado === 'pagada')
+  const pagadas = ordenes.filter((orden) => estaPagada(orden))
   const totalVendido = pagadas.reduce((suma, orden) => suma + orden.total, 0)
   const unidadesVendidas = pagadas.reduce(
     (suma, orden) => suma + orden.items.reduce((s, item) => s + item.cantidad, 0),
@@ -35,7 +36,7 @@ export function productosMasVendidos(ordenes: Orden[], limite = 5): ProductoVend
   const acumulado = new Map<number, ProductoVendido>()
 
   ordenes
-    .filter((orden) => orden.estado === 'pagada')
+    .filter((orden) => estaPagada(orden))
     .forEach((orden) => {
       orden.items.forEach((item) => {
         const actual = acumulado.get(item.productoId) ?? {
@@ -63,7 +64,7 @@ export function ventasPorCategoria(ordenes: Orden[], productos: Producto[], cate
   const montos = new Map<string, number>()
 
   ordenes
-    .filter((orden) => orden.estado === 'pagada')
+    .filter((orden) => estaPagada(orden))
     .forEach((orden) => {
       orden.items.forEach((item) => {
         const producto = productos.find((p) => p.id === item.productoId)

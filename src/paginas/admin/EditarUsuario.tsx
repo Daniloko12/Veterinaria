@@ -1,17 +1,39 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ErrorApi, erroresDeFormulario } from '../../api/cliente'
+import { actualizarUsuario, obtenerUsuario } from '../../api/usuariosApi'
 import BotonEnlace from '../../componentes/atomos/BotonEnlace'
+import Aviso from '../../componentes/moleculas/Aviso'
 import EncabezadoPagina from '../../componentes/moleculas/EncabezadoPagina'
+import EstadoCarga from '../../componentes/moleculas/EstadoCarga'
 import FormularioUsuario from '../../componentes/organismos/FormularioUsuario'
-import { actualizarUsuario, existeCorreo, existeRun, obtenerUsuarioPorId } from '../../datos/baseDatos'
+import { useCargar } from '../../hooks/useCargar'
 import { useSesion } from '../../hooks/useSesion'
 import type { Errores, Usuario } from '../../tipos'
 import type { DatosUsuarioFormulario } from '../../utilidades/validaciones'
 
+const CAMPOS: (keyof DatosUsuarioFormulario)[] = ['run', 'nombre', 'apellidos', 'correo', 'clave', 'fechaNacimiento', 'rol', 'region', 'comuna', 'direccion', 'activo']
+
+async function cargarUsuario(id: number) {
+  try {
+    return await obtenerUsuario(id)
+  } catch (error) {
+    if (error instanceof ErrorApi && error.estado === 404) return null
+    throw error
+  }
+}
+
+// PUT /api/usuarios/{id} (solo administrador)
 function EditarUsuario() {
   const { id } = useParams()
-  const usuario = obtenerUsuarioPorId(Number(id))
+  const { datos: usuario, cargando, error, recargar } = useCargar(() => cargarUsuario(Number(id)))
   const { sesion, actualizarSesion } = useSesion()
+  const [errorGeneral, setErrorGeneral] = useState('')
   const navigate = useNavigate()
+
+  if (cargando || error) {
+    return <EstadoCarga cargando={cargando} error={error} onReintentar={recargar} />
+  }
 
   if (!usuario) {
     return (
@@ -22,35 +44,35 @@ function EditarUsuario() {
     )
   }
 
-  function guardar(datos: Omit<Usuario, 'id'>): Errores<DatosUsuarioFormulario> {
+  async function guardar(datos: Omit<Usuario, 'id'>): Promise<Errores<DatosUsuarioFormulario>> {
     if (!usuario) return {}
-    const errores: Errores<DatosUsuarioFormulario> = {}
-    if (existeRun(datos.run, usuario.id)) errores.run = 'El RUN ya está registrado'
-    if (existeCorreo(datos.correo, usuario.id)) errores.correo = 'El correo ya está registrado'
-    if (errores.run || errores.correo) {
+    setErrorGeneral('')
+    // El administrador no puede quitarse su propio rol ni desactivarse (el backend también lo revisa)
+    const esPropio = usuario.id === sesion?.id
+    try {
+      const actualizado = await actualizarUsuario(usuario.id, esPropio ? { ...datos, rol: usuario.rol, activo: true } : datos)
+      if (esPropio) {
+        actualizarSesion({
+          id: actualizado.id,
+          nombre: actualizado.nombre,
+          apellidos: actualizado.apellidos,
+          correo: actualizado.correo,
+          rol: actualizado.rol,
+        })
+      }
+      navigate(`/admin/usuarios/${usuario.id}`, { state: { aviso: 'Usuario actualizado correctamente' } })
+      return {}
+    } catch (problema) {
+      const { errores, mensaje } = erroresDeFormulario<DatosUsuarioFormulario>(problema, CAMPOS)
+      setErrorGeneral(mensaje)
       return errores
     }
-
-    // El administrador no puede quitarse su propio rol ni desactivarse
-    const esPropio = usuario.id === sesion?.id
-    const actualizado = actualizarUsuario(usuario.id, esPropio ? { ...datos, rol: usuario.rol, activo: true } : datos)
-
-    if (esPropio && actualizado) {
-      actualizarSesion({
-        id: actualizado.id,
-        nombre: actualizado.nombre,
-        apellidos: actualizado.apellidos,
-        correo: actualizado.correo,
-        rol: actualizado.rol,
-      })
-    }
-    navigate(`/admin/usuarios/${usuario.id}`, { state: { aviso: 'Usuario actualizado correctamente' } })
-    return {}
   }
 
   return (
     <div>
       <EncabezadoPagina titulo={`Editar usuario: ${usuario.nombre} ${usuario.apellidos}`} />
+      <Aviso mensaje={errorGeneral} tipo="danger" onCerrar={() => setErrorGeneral('')} />
       <FormularioUsuario
         modo="editar"
         usuario={usuario}
