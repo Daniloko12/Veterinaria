@@ -7,6 +7,8 @@ export interface Categoria {
   nombre: string
   descripcion: string
   imagen: string
+  /** Lo calcula el backend (ms-productos) al listar categorías */
+  cantidadProductos?: number
 }
 
 export interface Producto {
@@ -21,6 +23,8 @@ export interface Producto {
   stockCritico: number
   categoriaId: number
   imagen: string
+  /** Nombre de la categoría, lo agrega el backend */
+  categoriaNombre?: string
 }
 
 export interface Novedad {
@@ -39,7 +43,8 @@ export interface Usuario {
   nombre: string
   apellidos: string
   correo: string
-  clave: string
+  /** Solo se envía al crear o cambiar la contraseña; el backend nunca la devuelve */
+  clave?: string
   fechaNacimiento: string
   rol: Rol
   region: string
@@ -64,6 +69,8 @@ export interface ItemCarrito {
   precio: number
   cantidad: number
   imagen: string
+  /** Stock disponible al momento de agregarlo (para no superar el máximo) */
+  stock?: number
 }
 
 export interface DatosCliente {
@@ -97,7 +104,8 @@ export interface PagoTarjeta {
   codigoAutorizacion: string
 }
 
-export type EstadoOrden = 'pagada' | 'rechazada'
+/** pagada → enviada → entregada. Una orden rechazada no cambia de estado. */
+export type EstadoOrden = 'pagada' | 'enviada' | 'entregada' | 'rechazada'
 
 export interface Orden {
   id: number
