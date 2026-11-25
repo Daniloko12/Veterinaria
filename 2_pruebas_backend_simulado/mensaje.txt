@@ -1,0 +1,1 @@
+Pruebas actualizadas con backend simulado
